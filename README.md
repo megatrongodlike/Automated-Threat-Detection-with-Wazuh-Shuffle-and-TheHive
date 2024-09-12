@@ -61,6 +61,73 @@ This project showcases an automated threat detection and response system using W
 
 2. Configure services and access TheHive at `http://<your_TheHive_IP_Address>:9000`.
 
+# Wazuh Configuration
+
+## Wazuh Agent Installation
+To collect and analyze events from endpoints, install the Wazuh Agent:
+
+1. **Add Agent**: Navigate to the Wazuh dashboard and click "Add Agent".
+2. **Server Address**: Enter the Wazuh server IP address.
+3. **Install Agent**: Execute the command provided by Wazuh on the Windows 10 endpoint.
+4. **Check Service**: Ensure the Wazuh service is running on the endpoint.
+5. **Agent Activation**: Refresh the Wazuh dashboard to confirm the agent is active.
+
+## Sysmon Log Forwarding Configuration
+1. Open the `ossec.conf` file located at:
+    ```bash
+    C:\Program Files (x86)\ossec-agent\ossec.conf
+    ```
+2. As an Administrator, add the following to send Sysmon logs to Wazuh:
+
+    ```xml
+    <localfile>
+      <location>Microsoft-Windows-Sysmon/Operational</location>
+      <log_format>eventchannel</log_format>
+    </localfile>
+    ```
+
+3. Optionally, for PowerShell logs, replace the `location` value:
+
+    ```xml
+    <localfile>
+      <location>Microsoft-Windows-PowerShell/Operational</location>
+      <log_format>eventchannel</log_format>
+    </localfile>
+    ```
+
+4. Save and restart the Wazuh service.
+
+## Mimikatz Detection
+Mimikatz is used for credential dumping. Here's how to detect it:
+
+1. **Download Mimikatz**: Disable Windows Defender, then download `mimikatz_trunk.zip`.
+2. **Run Mimikatz**: Extract the zip and execute `mimikatz.exe` using PowerShell as Administrator.
+3. **Check Logs**: Open Wazuh and monitor Sysmon logs. If Mimikatz isn't detected, edit the Wazuh configuration:
+    - Set `<logall>` and `<logall_json>` to `yes` in `/var/ossec/etc/ossec.conf`.
+    - Restart Wazuh Manager with:
+      ```bash
+      sudo systemctl restart wazuh-manager.service
+      ```
+
+## Creating a Custom Rule for Mimikatz
+1. Navigate to the **Rules** section in Wazuh.
+2. Add a custom rule in `local_rules.xml`:
+    ```xml
+    <rule id="100002" level="15">
+      <if_group>sysmon_event1</if_group>
+      <field name="win.eventdata.originalFileName" type="pcre2">(?i)mimikatz\.exe</field>
+      <description>Malicious Activity : Mimikatz Detected!</description>
+      <mitre>
+        <id>T1003</id>
+      </mitre>
+    </rule>
+    ```
+3. **Test the Rule**: Run Mimikatz on the Windows machine again and check if the alert is triggered.
+
+4. **Test with Renamed File**: Rename `mimikatz.exe` to another name (e.g., `svchost.exe`) and verify the rule still triggers based on the `originalFileName`.
+
 ## Conclusion
-This project integrates Wazuh, Shuffle, and TheHive for real-time detection and response. By automating workflows, it streamlines SOC operations and reduces threat response time.
+This configuration allows real-time monitoring and detection of Mimikatz on Windows systems using Wazuh, ensuring that even if an attacker renames the file, the detection will still work.
+
+
 
